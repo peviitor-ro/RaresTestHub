@@ -3,23 +3,79 @@ from sites.vetro import vetroScraper
 import pytest
 import allure
 
+
 def get_jobs_careers():
     """
     Fixture for scraping process from the career section.
     """
     return vetroScraper().return_data()
 
-
 scraper_data = get_jobs_careers()
 scraped_jobs_data = TestUtils.scrape_jobs(scraper_data[0])
-
 peviitor_jobs_data = TestUtils.scrape_peviitor(scraper_data[1], 'România')
 company_name = 'vetro'
+
+# Utility function for checking missing items
+def get_missing_items(list_a, list_b):
+    return [item for item in list_a if item not in list_b][:40]
+
+# Check function for job titles
+def check_job_titles(expected_titles, actual_titles):
+    missing_titles = get_missing_items(expected_titles, actual_titles)
+
+    if missing_titles:
+        msg = f"Peviitor is having extra job titles: {missing_titles}"
+    else:
+        missing_titles = get_missing_items(actual_titles, expected_titles)
+        msg = f"Peviitor is missing job titles: {missing_titles}"
+
+    allure.step(msg)
+    assert expected_titles == actual_titles, msg
+
+# Check function for job cities
+def check_job_cities(expected_cities, actual_cities):
+    missing_cities = get_missing_items(expected_cities, actual_cities)
+
+    if missing_cities:
+        msg = f"Peviitor is having extra job cities: {missing_cities}"
+    else:
+        missing_cities = get_missing_items(actual_cities, expected_cities)
+        msg = f"Peviitor is missing job cities: {missing_cities}"
+
+    allure.step(msg)
+    assert expected_cities == actual_cities, msg
+
+# Check function for job countries
+def check_job_countries(expected_countries, actual_countries):
+    missing_countries = get_missing_items(expected_countries, actual_countries)
+
+    if missing_countries:
+        msg = f"Peviitor is having extra job countries: {missing_countries}"
+    else:
+        missing_countries = get_missing_items(actual_countries, expected_countries)
+        msg = f"Peviitor is missing job countries: {missing_countries}"
+
+    allure.step(msg)
+    assert expected_countries == actual_countries, msg
+
+# Check function for job links
+def check_job_links(expected_links, actual_links):
+    missing_links = get_missing_items(expected_links, actual_links)
+
+    if missing_links:
+        msg = f"Peviitor is having extra job links: {missing_links}"
+    else:
+        missing_links = get_missing_items(actual_links, expected_links)
+        msg = f"Peviitor is missing job links: {missing_links}"
+
+    allure.step(msg)
+    assert expected_links == actual_links, msg
+
+# Test functions
 
 @pytest.mark.regression
 @pytest.mark.API
 def test_vetro_title_api():
-    
     allure.dynamic.title(f"Test job titles from the {company_name} website against Peviitor API Response")
 
     with allure.step("Step 1: Get job titles from the scraper"):
@@ -27,110 +83,54 @@ def test_vetro_title_api():
     
     with allure.step("Step 2: Get job titles from the Peviitor API"):
         job_titles_peviitor = sorted(peviitor_jobs_data[0])
-    
-    missing_job_titles = []
-    # Itterate over job titles and if not present on peviitor add to missing job title list
-    for job_title in job_titles_scraper:
-        if job_title not in job_titles_peviitor:
-            missing_job_titles.append(job_title)
-    
+
     with allure.step("Step 3: Compare job titles from scraper response against Peviitor API Response"):
-        # If the missing job list is empty it might mean there are more jobs on peviitor than needed
-        if missing_job_titles == []:
-            missing_job_titles_peviitor = []
-            for job_title in job_titles_peviitor:
-                if job_title not in job_titles_scraper:
-                    missing_job_titles_peviitor.append(job_title)
-                    
-            # If there are way too many jobs titles only list a couple of them
-            if len(missing_job_titles_peviitor) > 20:
-                missing_job_titles_peviitor = f"{missing_job_titles_peviitor[:5]} and many more"
-                            
-            print(f"Expected Results: {job_titles_scraper}\n")
-            print(f"Actual Results: {job_titles_peviitor}")
-            assert job_titles_scraper == job_titles_peviitor, f"Peviitor is having the following extra jobs titles: {missing_job_titles_peviitor}\n\n"
-        else:
-            if len(missing_job_titles) > 20:
-                missing_job_titles = f"{missing_job_titles[:5]} and many more"
-                
-            print(f"Expected Results: {job_titles_scraper}\n")
-            print(f"Actual Results: {job_titles_peviitor}")
-            assert job_titles_scraper == job_titles_peviitor, f"Peviitor is missing the following job titles: {missing_job_titles}\n\n"
-            
+        allure.attach(f"Expected Results: {job_titles_scraper}", name="Expected Results")
+        allure.attach(f"Actual Results: {job_titles_peviitor}", name="Actual Results")
+        check_job_titles(job_titles_scraper, job_titles_peviitor)
+
 @pytest.mark.regression
 @pytest.mark.API
 def test_vetro_city_api():
-    
     allure.dynamic.title(f"Test job cities from the {company_name} website against Peviitor API Response")
-    
+
     with allure.step("Step 1: Get job cities from the scraper"):
         job_cities_scraper = sorted(scraped_jobs_data[1])
-    
+        
     with allure.step("Step 2: Get job cities from the Peviitor API"):
         job_cities_peviitor = sorted(peviitor_jobs_data[1])
-    
+
     with allure.step("Step 3: Compare job cities from scraper response against Peviitor API Response"):
-        print(f"Expected Results: {job_cities_scraper}\n")
-        print(f"Actual Results: {job_cities_peviitor}")
-        
-        if job_cities_scraper != job_cities_peviitor:
-            assert job_cities_scraper == job_cities_peviitor, f"Peviitor is having extra jobs cities\n\n"
-        else:
-            assert job_cities_scraper == job_cities_peviitor, f"Peviitor is missing job cities\n\n"
-        
-             
+        allure.attach(f"Expected Results: {job_cities_scraper}", name="Expected Results")
+        allure.attach(f"Actual Results: {job_cities_peviitor}", name="Actual Results")
+        check_job_cities(job_cities_scraper, job_cities_peviitor)
+
 @pytest.mark.regression
 @pytest.mark.API
 def test_vetro_country_api():
-    
     allure.dynamic.title(f"Test job countries from the {company_name} website against Peviitor API Response")
-    
+
     with allure.step("Step 1: Get job countries from the scraper"):
         job_countries_scraper = sorted(scraped_jobs_data[2])
-    
     with allure.step("Step 2: Get job countries from the Peviitor API"):
         job_countries_peviitor = sorted(peviitor_jobs_data[2])
-    
+
     with allure.step("Step 3: Compare job countries from scraper response against Peviitor API Response"):
-        print(f"Expected Results: {job_countries_scraper}\n")
-        print(f"Actual Results: {job_countries_peviitor}")
-        if job_countries_scraper != job_countries_peviitor:
-            assert job_countries_scraper == job_countries_peviitor, f"Peviitor is having extra job countries\n\n"
-        else:
-            assert job_countries_scraper == job_countries_peviitor, f"Peviitor is missing job countries\n\n"
+        allure.attach(f"Expected Results: {job_countries_scraper}", name="Expected Results")
+        allure.attach(f"Actual Results: {job_countries_peviitor}", name="Actual Results")
+        check_job_countries(job_countries_scraper, job_countries_peviitor)
 
 @pytest.mark.regression
 @pytest.mark.API
 def test_vetro_link_api():
-    
     allure.dynamic.title(f"Test job links from the {company_name} website against Peviitor API Response")
-    
+
     with allure.step("Step 1: Get job links from the scraper"):
         job_links_scraper = sorted(scraped_jobs_data[3])
-    
     with allure.step("Step 2: Get job links from the Peviitor API"):
         job_links_peviitor = sorted(peviitor_jobs_data[3])
-    
-    missing_job_links = []
-    
-    for job_link in job_links_scraper:
-        if job_link not in job_links_peviitor:
-            missing_job_links.append(job_link)
-    
+
     with allure.step("Step 3: Compare job links from scraper response against Peviitor API Response"):
-        print(f"Expected Results: {job_links_scraper}\n")
-        print(f"Actual Results: {job_links_peviitor}")
-        if missing_job_links == []:
-            missing_job_links_peviitor = []
-            if job_link in job_links_peviitor:
-                if job_link not in job_links_scraper:
-                    missing_job_links_peviitor.append(job_link)
-                    
-            if len(missing_job_links_peviitor) > 20:
-                missing_job_links_peviitor = f"{missing_job_links_peviitor[:5]} and many more"
-            assert job_links_scraper == job_links_peviitor, f"Peviitor is having the following extra jobs links: {missing_job_links_peviitor}\n\n"
-        else:
-            if len(missing_job_links) > 20:
-                missing_job_links = f"{missing_job_links[:5]} and many more"
-            assert job_links_scraper == job_links_peviitor, f"Peviitor is missing the following job links: {missing_job_links}\n\n"
-            
+        allure.attach(f"Expected Results: {job_links_scraper}", name="Expected Results")
+        allure.attach(f"Actual Results: {job_links_peviitor}", name="Actual Results")
+        check_job_links(job_links_scraper, job_links_peviitor)
