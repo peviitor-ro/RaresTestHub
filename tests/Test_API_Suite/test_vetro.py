@@ -3,17 +3,18 @@ from sites.vetro import vetroScraper
 import pytest
 import allure
 
+company_name = 'vetro'
 
-def get_jobs_careers():
+@pytest.fixture(scope="module", autouse=True)
+def get_job_details():
     """
     Fixture for scraping process from the career section.
     """
-    return vetroScraper().return_data()
-
-scraper_data = get_jobs_careers()
-scraped_jobs_data = TestUtils.scrape_jobs(scraper_data[0])
-peviitor_jobs_data = TestUtils.scrape_peviitor(scraper_data[1], 'România')
-company_name = 'vetro'
+    scraper_data = vetroScraper().return_data()
+    scraped_jobs_data = TestUtils.scrape_jobs(scraper_data[0])
+    peviitor_jobs_data = TestUtils.scrape_peviitor(scraper_data[1], 'România')
+    return scraped_jobs_data, peviitor_jobs_data
+    
 
 # Utility function for checking missing items
 def get_missing_items(list_a, list_b):
@@ -75,9 +76,10 @@ def check_job_links(expected_links, actual_links):
 
 @pytest.mark.regression
 @pytest.mark.API
-def test_vetro_title_api():
+def test_vetro_title_api(get_job_details):
     allure.dynamic.title(f"Test job titles from the {company_name} website against Peviitor API Response")
 
+    scraped_jobs_data, peviitor_jobs_data = get_job_details
     with allure.step("Step 1: Get job titles from the scraper"):
         job_titles_scraper = sorted(scraped_jobs_data[0])
     
@@ -91,9 +93,10 @@ def test_vetro_title_api():
 
 @pytest.mark.regression
 @pytest.mark.API
-def test_vetro_city_api():
+def test_vetro_city_api(get_job_details):
     allure.dynamic.title(f"Test job cities from the {company_name} website against Peviitor API Response")
 
+    scraped_jobs_data, peviitor_jobs_data = get_job_details
     with allure.step("Step 1: Get job cities from the scraper"):
         job_cities_scraper = sorted(scraped_jobs_data[1])
         
@@ -107,9 +110,10 @@ def test_vetro_city_api():
 
 @pytest.mark.regression
 @pytest.mark.API
-def test_vetro_country_api():
+def test_vetro_country_api(get_job_details):
     allure.dynamic.title(f"Test job countries from the {company_name} website against Peviitor API Response")
 
+    scraped_jobs_data, peviitor_jobs_data = get_job_details
     with allure.step("Step 1: Get job countries from the scraper"):
         job_countries_scraper = sorted(scraped_jobs_data[2])
     with allure.step("Step 2: Get job countries from the Peviitor API"):
@@ -122,9 +126,10 @@ def test_vetro_country_api():
 
 @pytest.mark.regression
 @pytest.mark.API
-def test_vetro_link_api():
+def test_vetro_link_api(get_job_details):
     allure.dynamic.title(f"Test job links from the {company_name} website against Peviitor API Response")
 
+    scraped_jobs_data, peviitor_jobs_data = get_job_details
     with allure.step("Step 1: Get job links from the scraper"):
         job_links_scraper = sorted(scraped_jobs_data[3])
     with allure.step("Step 2: Get job links from the Peviitor API"):
