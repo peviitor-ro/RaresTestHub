@@ -145,10 +145,7 @@ class TestUtils:
     def check_code_job_links(self, status_codes_expected_result, status_codes_actual_result):
         http_codes = self.get_missing_items(status_codes_expected_result, status_codes_actual_result)
 
-        if http_codes:
-            msg = f"Some job links within peviitor API do not return 200 http status code: {http_codes}"
-        else:
-            http_codes = self.get_missing_items(status_codes_actual_result, status_codes_expected_result)
+        if not http_codes:
             msg = f"Some job links from scraper do not return 200 http status code: {http_codes}"
         
         if not status_codes_expected_result and not status_codes_actual_result:
