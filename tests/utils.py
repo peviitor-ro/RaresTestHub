@@ -1,6 +1,9 @@
 from unidecode import unidecode
+from tests.push_to_prod import Pushprod
+from sites.setup_api import UpdatePeviitorAPI
 import requests
 import allure
+import re
 
 class TestUtils:
 
@@ -16,6 +19,9 @@ class TestUtils:
         # Check if the cities list is a nested list
         job_city = [self.remove_diacritics(city['city']) if isinstance(city['city'], list) else [self.remove_diacritics(city['city'])] for city in scraper_data]
             
+        # Filtered jobs that we will push to prod
+        self.filtered_job_titles, self.filtered_job_cities, self.filtered_job_links, self.filtered_job_types, self.filtered_job_countries = title[:], job_city[:], job_link[:], job_type[:], job_country[:]
+        
         return title, job_city, job_country, job_link, job_type
 
     @staticmethod
@@ -25,9 +31,12 @@ class TestUtils:
         """
         params = {
             'company': company_name,
-            'country': country,
             'page': page,
+            'page_size': '10000',
+            'order': 'all',
+            'search': '',
         }
+        
         return params
     
     @staticmethod
@@ -35,9 +44,17 @@ class TestUtils:
         """
         Send a get request to get the jobs from future
         """
-        response = requests.get('https://api.peviitor.ro/v3/search/', params=params).json()
-        if 'response' in response and 'docs' in response['response']:
-            response_data = response['response']['docs']
+        updateapi = UpdatePeviitorAPI()
+        updateapi.get_token()
+        
+        headers = {
+            'accept': 'application/json, text/plain, */*',
+            'authorization': f'Bearer {updateapi.access_token}',
+        }
+        
+        response = requests.get('https://api.laurentiumarian.ro/jobs/get/', params=params, headers=headers).json()
+        if 'results' in response:
+            response_data = response['results']
             return response_data
         else:
             return []
@@ -52,11 +69,11 @@ class TestUtils:
         params = TestUtils._set_params(company_name, page, country)
         response_data = TestUtils._get_request(params)
         while response_data:
-            all_future_title.extend([title['job_title'][0] for title in response_data])
+            all_future_title.extend([title['job_title'] for title in response_data])
             all_future_job_country.extend([self.remove_diacritics(country['country'][0]) for country in response_data])
-            all_future_job_link.extend([job_link['job_link'][0] for job_link in response_data])
-            all_future_job_companies.extend([company['company'][0] for company in response_data])
-            all_future_job_types.extend([job_link['remote'][0] for job_link in response_data])
+            all_future_job_link.extend([job_link['job_link'] for job_link in response_data])
+            all_future_job_companies.extend([company['company'] for company in response_data])
+            all_future_job_types.extend([job_link['remote'] for job_link in response_data])
             
             # Check if the cities list is a nested list
             city_list = [self.remove_diacritics(city['city']) for city in response_data]
@@ -72,6 +89,27 @@ class TestUtils:
             response_data = TestUtils._get_request(params)
 
         return all_future_title, all_future_job_city, all_future_job_country, all_future_job_link, all_future_job_companies, all_future_job_types
+
+    # Check if a string has special characters
+    def check_special_characters(self, string):
+        # Regular expression to match any special characters
+        regex = re.compile(r'[@_!$%^&*<>?|}{~:]')
+
+        # Search for special characters in the string
+        if regex.search(string) is not None:
+            return string
+        else:
+            return False
+
+    # return the non special characters for a job title
+    def return_without_special_characters(self, string):
+        # Regular expression to match any non-letter, non-digit, non-exception characters
+        regex = re.compile(r'[^a-zA-Z0-9\s#/\\(),.]')
+
+        # Replace special characters with an empty string
+        result = re.sub(regex, '', string)
+
+        return result
     
     # Remove diacritics from input recursive
     def remove_diacritics(self, item):
@@ -122,9 +160,36 @@ class TestUtils:
         
         allure.step(msg)
         assert expected_titles == actual_titles, msg
+
+    # Check method for job titles special characters
+    def check_special_job_titles(self, expected_titles):
+        # return if any job title contains special characters
+        special_job_titles = [self.check_special_characters(job_title) for job_title in expected_titles if self.check_special_characters(job_title) != False]
+        
+        msg = "Unknown error occured"
+
+        if special_job_titles:
+            msg = f"Peviitor is having job titles with special characters: {special_job_titles}"
+            for special_job_title in special_job_titles:
+                for job_title_index, job_title in enumerate(self.filtered_job_titles):
+                    if special_job_title == job_title:
+                        self.filtered_job_titles[job_title_index] = 'REMOVED_JOB'
+
+        if not expected_titles and not special_job_titles:
+            msg = f"Scraper is not grabbing any job titles"
+            allure.step(msg)
+            raise AssertionError(msg)
+        
+        # Search if there are special job titles missing from expected_titles
+        filtered_special_job_titles = [self.return_without_special_characters(job_title) for job_title in expected_titles]
+        allure.attach(f"Scraper Expected Results: {filtered_special_job_titles}", name="Actual Results")
+        
+        allure.step(msg)
+        assert special_job_titles == [], msg
         
     # Check method for job cities
     def check_job_cities(self, expected_cities, actual_cities, job_titles_scraper, api_job_titles):
+        expected_cities, actual_cities, job_titles_scraper, api_job_titles = sorted(expected_cities), sorted(actual_cities), sorted(job_titles_scraper), sorted(api_job_titles)
         if not expected_cities:
             msg = f"Scraper is not grabbing any job cities"
             allure.step(msg)
@@ -179,12 +244,15 @@ class TestUtils:
 
     # Check method for job types
     def check_job_types(self, expected_types, actual_types, job_titles_scraper, api_job_titles):
+        
         if not expected_types:
             msg = f"Scraper is not grabbing any job types"
             allure.step(msg)
             raise AssertionError(msg)
         
         msg = "An unknown error occured"
+        
+        expected_types, actual_types, job_titles_scraper, api_job_titles = sorted(expected_types), sorted(actual_types), sorted(job_titles_scraper), sorted(api_job_titles)
         
         # Check job types from scraper against the peviitor api
         scraper_actual_types, scraper_job_titles = self.get_different_items(expected_types, actual_types, job_titles_scraper)
@@ -203,6 +271,20 @@ class TestUtils:
         
         allure.step(msg)
         assert expected_types == actual_types, msg
+    
+    def check_job_format_types(self, job_types_scraper):
+        msg = "An unknown error occured"
+        expected_job_type_formats = ["hybrid", "remote", "on-site"]
+        
+        for job_type in job_types_scraper:
+            if job_type not in expected_job_type_formats:
+                msg = f"One of the job format types is not within the expected job type formats"
+                for scraper_job_type_index, scraper_job_type in enumerate(self.filtered_job_types):
+                    if job_type == scraper_job_type:
+                        self.filtered_job_titles[scraper_job_type_index] = 'REMOVED_JOB'
+                raise AssertionError(msg)
+        
+        assert job_types_scraper, msg
 
     # Check method for job links
     def check_job_links(self, expected_links, actual_links):
@@ -257,6 +339,9 @@ class TestUtils:
         if not http_codes:
             msg = f"Some job links from scraper do not return 200 http status code: {http_codes}"
             allure.step(msg)
+            for job_link_http_index, http_code in enumerate(status_codes_actual_result):
+                if http_code != 200:
+                    self.filtered_job_links[job_link_http_index] = 'REMOVED_JOB'
         
         if not status_codes_expected_result and not status_codes_actual_result:
             msg = f"Scraper is not grabbing any job links"
@@ -287,4 +372,11 @@ class TestUtils:
                 raise AssertionError(msg)
         
         assert expected_company_name == actual_company_name, "An unknown error occured in the API job company name test case"
+    
+    def send_to_prod(self, company_name):
+        pushprod = Pushprod(company_name)
+        pushprod.add_job_details(self.filtered_job_titles, self.filtered_job_cities, self.filtered_job_links, self.filtered_job_types, self.filtered_job_countries)
+        pushprod.set_headers()
+        pushprod.push_to_prod()
+        # print(self.filtered_job_titles, self.filtered_job_cities, self.filtered_job_links, self.filtered_job_types, self.filtered_job_countries)
         
