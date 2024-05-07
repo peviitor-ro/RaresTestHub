@@ -9,7 +9,7 @@ class UpdatePeviitorAPI:
     Class for updating data on pe viitor API
     """
 
-    def __init__(self, company_name, data_list):
+    def __init__(self, company_name=None, data_list=None):
         """
         Initialize the UpdatePeviitorAPI instance.
         """
